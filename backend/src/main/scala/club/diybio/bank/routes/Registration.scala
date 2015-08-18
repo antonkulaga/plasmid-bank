@@ -50,7 +50,8 @@ with WithRegistrationRejections
         pathPrefix("status"){
           this.authenticate(userByToken){user=>
             complete(user.username)
-          }         }
+          }
+        }
     }
 }
 

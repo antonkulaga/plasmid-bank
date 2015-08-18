@@ -1,5 +1,6 @@
 import com.typesafe.sbt.SbtNativePackager.autoImport._
-import com.typesafe.sbt.web.SbtWeb
+import com.typesafe.sbt.web.{PathMapping, SbtWeb}
+import com.typesafe.sbt.web.pipeline.Pipeline
 import org.scalajs.sbtplugin.ScalaJSPlugin
 import org.scalajs.sbtplugin.ScalaJSPlugin.autoImport._
 import sbt.Keys._
@@ -8,10 +9,28 @@ import spray.revolver.RevolverPlugin._
 import play.twirl.sbt._
 import play.twirl.sbt.SbtTwirl.autoImport._
 import com.typesafe.sbt.web.SbtWeb.autoImport._
-
+import com.typesafe.sbt.gzip.Import._
+import com.typesafe.sbt.web.SbtWeb.autoImport._
+import com.typesafe.sbt.web._
+import com.typesafe.sbt.web.pipeline.Pipeline
+import org.scalajs.sbtplugin.ScalaJSPlugin.autoImport._
+import play.twirl.sbt._
+import playscalajs.PlayScalaJS.autoImport._
+import playscalajs.ScalaJSPlay.autoImport._
+import playscalajs.{PlayScalaJS, ScalaJSPlay}
+import sbt.Keys._
+import sbt._
+import spray.revolver.RevolverPlugin._
 
 object Build extends sbt.Build {
-  
+
+	val scalaJSDevStage  = Def.taskKey[Pipeline.Stage]("Apply fastOptJS on all Scala.js projects")
+
+	def scalaJSDevTaskStage: Def.Initialize[Task[Pipeline.Stage]] = Def.task { mappings: Seq[PathMapping] =>
+		mappings ++ PlayScalaJS.devFiles(Compile).value ++ PlayScalaJS.sourcemapScalaFiles(fastOptJS).value
+	}
+
+
 	//settings for all the projects
 	lazy val commonSettings = Seq(
     scalaVersion := Versions.scala,
@@ -52,7 +71,7 @@ object Build extends sbt.Build {
 			jsDependencies += RuntimeDOM % "test",
 			testFrameworks += new TestFramework("utest.runner.Framework"),
 			libraryDependencies ++= Dependencies.sjsLibs.value
-		)	enablePlugins ScalaJSPlugin dependsOn sharedJS aggregate sharedJS
+		)	enablePlugins ScalaJSPlay dependsOn sharedJS aggregate sharedJS
 
 	//backend project
 	lazy val backend = Project("backend", file("backend"),settings = commonSettings++Revolver.settings)
@@ -61,22 +80,24 @@ object Build extends sbt.Build {
 			libraryDependencies ++= Dependencies.akka.value++Dependencies.webjars.value++Dependencies.rdf.value,
 				mainClass in Compile :=Some("club.diybio.bank.Main"),
         mainClass in Revolver.reStart := Some("club.diybio.bank.Main"),
-        resourceGenerators in Compile <+=  (fastOptJS in Compile in frontend,
-				  packageScalaJSLauncher in Compile in frontend) map( (f1, f2) => Seq(f1.data, f2.data)),
+				scalaJSDevStage := scalaJSDevTaskStage.value,
+				//pipelineStages := Seq(scalaJSProd,gzip),
+				(emitSourceMaps in fullOptJS) := true,
+				pipelineStages in Assets := Seq(scalaJSDevStage,gzip), //for run configuration
+				(managedClasspath in Runtime) += (packageBin in Assets).value, //to package production deps
+				scalaJSProjects := Seq(frontend),
 				resolvers += "Bigdata releases" at "http://systap.com/maven/releases/",
 				resolvers += "apache-repo-releases" at "http://repository.apache.org/content/repositories/releases/",
 				resolvers += "nxparser-repo" at "http://nxparser.googlecode.com/svn/repository/",
 				dependencyOverrides += "org.apache.lucene" % "lucene-core" % Versions.bigdataLuceneVersion, //bigdata uses outdated lucene :_(
 				dependencyOverrides += "org.apache.lucene" % "lucene-analyzers" % Versions.bigdataLuceneVersion, //bigdata uses outdated lucene
-
-			watchSources <++= (watchSources in frontend),
-      (managedClasspath in Runtime) += (packageBin in Assets).value
-		) enablePlugins(SbtTwirl,SbtWeb) dependsOn sharedJVM aggregate sharedJVM
+	    	(managedClasspath in Runtime) += (packageBin in Assets).value
+		) enablePlugins(SbtTwirl,SbtWeb,PlayScalaJS) dependsOn sharedJVM aggregate sharedJVM
 
 	lazy val root = Project("root",file("."),settings = commonSettings)
 		.settings(
-			mainClass in Compile := (mainClass in backend in Compile).value
-			//libraryDependencies += "com.lihaoyi" % "ammonite-repl_2.11.6" %  Versions.ammonite,
-			//initialCommands in console := """ammonite.repl.Repl.run("")""" //better console
+			mainClass in Compile := (mainClass in backend in Compile).value,
+			libraryDependencies += "com.lihaoyi" % "ammonite-repl" % Versions.ammonite cross CrossVersion.full,
+			initialCommands in console := """ammonite.repl.Repl.run("")""" //better console
     ) dependsOn backend aggregate(backend,frontend)
 }

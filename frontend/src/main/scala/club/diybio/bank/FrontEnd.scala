@@ -1,19 +1,18 @@
 package club.diybio.bank
 
 import club.diybio.bank.views.{MenuView, SidebarView}
+import org.denigma.binding.binders.{GeneralBinder, NavigationBinding}
 import org.denigma.binding.extensions._
 import org.denigma.binding.views.BindableView
-import org.denigma.binding.views.utils.ViewInjector
 import org.denigma.controls.login.{AjaxSession, LoginView}
 import org.querki.jquery._
 import org.scalajs.dom
 import org.scalajs.dom.raw.HTMLElement
-import rx.core.Var
+import org.semantic.SidebarConfig
+import org.semantic.ui._
 
 import scala.collection.immutable.Map
-import scala.scalajs.js
 import scala.scalajs.js.annotation.JSExport
-import scala.util.Try
 
 
 @JSExport("FrontEnd")
@@ -22,28 +21,27 @@ object FrontEnd extends BindableView with scalajs.js.JSApp
 
   override def name = "main"
 
-  val hello = Var("HELLO WORLD!")
-
   lazy val elem: HTMLElement = dom.document.body
 
   override val params: Map[String, Any] = Map.empty
 
-  val sidebarParams = js.Dynamic.literal(
-    exclusive = false,
-    dimPage = false,
-    closable = false,
-    useLegacy = false
-  )
+  val sidebarParams = SidebarConfig.exclusive(false).dimPage(false).closable(false).useLegacy(false)
 
-  val session = new AjaxSession
+  val session = new AjaxSession()
 
   /**
    * Register views
    */
-  ViewInjector
-    .register("menu", (el, params) =>Try(new MenuView(el,params)))
-    .register("sidebar", (el, params) =>Try(new SidebarView(el,params)))
-    .register("login", (el, params) =>Try(new LoginView(el,session,params)))
+  override lazy val injector = defaultInjector
+    .register("menu"){
+      case (el, args) =>
+        new MenuView(el,args).withBinders(menu=>List(new GeneralBinder(menu),new NavigationBinding(menu)))
+    }
+    .register("sidebar"){ case (el, args) => new SidebarView(el,args).withBinder(new GeneralBinder(_)) }
+    .register("login"){ case (el, args) => new LoginView(el,session,args).withBinder(new GeneralBinder(_)) }
+
+
+  this.withBinder(new GeneralBinder(_))
 
   @JSExport
   def main(): Unit = {
@@ -56,7 +54,7 @@ object FrontEnd extends BindableView with scalajs.js.JSApp
 
   @JSExport
   def showLeftSidebar() = {
-    $(".left.sidebar").dyn.sidebar(sidebarParams).sidebar("show")
+    $(".left.sidebar").sidebar(sidebarParams).show()
   }
 
   @JSExport
@@ -73,13 +71,5 @@ object FrontEnd extends BindableView with scalajs.js.JSApp
       this.loadElementInto(intoElement, ins.innerHTML)
       ins.parentNode.removeChild(ins)
     }
-  }
-
-  override def activateMacro(): Unit = {
-    extractors.foreach(_.extractEverything(this))
-  }
-
-  def attachBinders() = {
-    this.binders = BindableView.defaultBinders(this)
   }
 }

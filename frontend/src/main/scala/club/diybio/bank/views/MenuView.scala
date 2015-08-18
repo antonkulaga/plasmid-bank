@@ -6,6 +6,8 @@ import org.scalajs.dom.raw.HTMLElement
 import rx.Rx
 import rx.core.Var
 import rx.ops._
+import org.denigma.binding.binders.{GeneralBinder, NavigationBinding}
+
 
 import scala.collection.immutable.Map
 
@@ -24,22 +26,16 @@ object TestData{
 class MenuView(val elem:HTMLElement, val params:Map[String,Any] = Map.empty) extends CollectionView
 {
 
-  override def activateMacro(): Unit = { extractors.foreach(_.extractEverything(this))}
-
-  override protected def attachBinders(): Unit =withBinders(BindableView.defaultBinders(this))
-
   override type Item = String
 
+
   override def newItem(item: Item) = this.constructItemView(item){ case (el,mp)=> //TODO: rename constructItem to smt like ConstructItemView
-    new MenuItem(el,item,mp)
+    new MenuItem(el,item,mp).withBinders(i=>List(new GeneralBinder(i),new NavigationBinding(i)))
   }
 
   override type ItemView = MenuItem
 
-
-
   override val items: Rx[List[Item]] = Var(TestData.menuItems)
-
 
 }
 
@@ -47,10 +43,5 @@ class MenuItem(val elem:HTMLElement,value:String, val params:Map[String,Any] = M
 
   val label: Var[String] = Var(value)
   val uri: Rx[String] = label.map(l=>TestData.prefix+l.replace(" ","_"))
-
-
-  override def activateMacro(): Unit = { extractors.foreach(_.extractEverything(this))}
-
-  override protected def attachBinders(): Unit = withBinders(BindableView.defaultBinders(this))
 
 }

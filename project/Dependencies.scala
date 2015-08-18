@@ -22,11 +22,14 @@ object Dependencies {
 
 	//scalajs libs
 	lazy val sjsLibs= Def.setting(Seq(
-		"org.querki" %%% "jquery-facade" % Versions.jqueryFacade //scalajs facade for jQuery + jQuery extensions
+		"org.querki" %%% "jquery-facade" % Versions.jqueryFacade, //scalajs facade for jQuery + jQuery extensions
+
+		"org.denigma" %%% "semantic-ui-facade" % Versions.semanticUIFacade
 	))
 
 	//dependencies on javascript libs
 	lazy val webjars= Def.setting(Seq(
+
 
 		"org.webjars" % "Semantic-UI" % Versions.semanticUI, //css theme, similar to bootstrap
 
